@@ -44,7 +44,7 @@ Follow these steps to set up the project on your Windows computer.
 3. Clone this repository. Replace `your-username` with your GitHub username:
 
    ```
-   git clone https://github.com/your-username/distributed-task-queue.git
+   git clone https://github.com/DhaatuTheGamer/distributed-task-queue
    ```
 4. Move into the project folder:
 
