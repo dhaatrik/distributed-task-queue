@@ -1,454 +1,446 @@
-# Distributed Task Queue Project
+<div align="center">
 
-This is a beginner-friendly Python project that uses **Celery**, **Redis**, and **FastAPI** to create a system for processing tasks in the background. For example, you can send a task (like processing some data) to the system, and it will handle it while you do other things. It’s like sending a job to a worker who reports back when done!
+# ⚡ TaskForge
 
-The project includes:
+### A production-ready distributed task queue built with FastAPI, Celery, and Redis
 
-- A **FastAPI** web server to submit tasks and check their status.
-- **Celery** to manage and process tasks in the background.
-- **Redis** to store tasks and results.
-- **Authentication** so only authorized users can submit tasks.
-- **Rate limiting** to prevent too many requests.
-- **Flower** to monitor tasks in a web dashboard.
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Celery](https://img.shields.io/badge/Celery-5.5-37814A?style=flat&logo=celery&logoColor=white)](https://docs.celeryq.dev/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis&logoColor=white)](https://redis.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
 
-This guide is for beginners. Follow the steps carefully to set up and run the project on **Windows**.
-
----
-
-## Prerequisites
-
-Before you start, make sure you have:
-
-1. **Python 3.12** installed. Download it from python.org and install it, checking “Add Python to PATH” during setup.
-2. **Docker Desktop** installed. Get it from docker.com and ensure it’s running.
-3. **Git** installed. Download it from git-scm.com and install with default settings.
-4. **VS Code** (optional but recommended). Download it from code.visualstudio.com.
-5. A **GitHub account**. Sign up at github.com if you don’t have one.
+</div>
 
 ---
 
-## Setup Instructions
+TaskForge is a full-stack distributed task queue system that offloads time-intensive background jobs from your main application thread, keeping your API fast and responsive. It ships with a modern, real-time web dashboard for submitting and monitoring tasks, JWT-authenticated REST endpoints, priority task queues, and Celery signal-based database persistence — so task results are written the moment a worker finishes, not only when a client polls.
 
-Follow these steps to set up the project on your Windows computer.
-
-### Step 1: Clone the Project
-
-1. Open VS Code and go to **Terminal** > **New Terminal**.
-2. Navigate to your project folder (e.g., `E:\List`). Type:
-
-   ```
-   cd E:\List
-   ```
-
-   and press Enter.
-3. Clone this repository. Replace `your-username` with your GitHub username:
-
-   ```
-   git clone https://github.com/DhaatuTheGamer/distributed-task-queue
-   ```
-4. Move into the project folder:
-
-   ```
-   cd distributed-task-queue
-   ```
-
-### Step 2: Set Up Redis with Docker
-
-1. Open a Command Prompt (search “cmd” in Windows).
-2. Start Redis in Docker:
-
-   ```
-   docker run -d -p 6379:6379 --name redis-server redis
-   ```
-3. Check it’s running:
-
-   ```
-   docker ps
-   ```
-
-   You should see `redis-server` listed.
-
-### Step 3: Create a Virtual Environment
-
-1. In the VS Code terminal (in the project folder), create a virtual environment:
-
-   ```
-   python -m venv venv
-   ```
-2. Activate it:
-
-   ```
-   .\venv\Scripts\activate
-   ```
-
-   You’ll see `(venv)` in the terminal prompt.
-
-### Step 4: Install Dependencies
-
-1. Install the project’s packages:
-
-   ```
-   pip install -r requirements.txt
-   ```
-2. Verify installation:
-
-   ```
-   pip list
-   ```
-
-   Check that packages like `celery`, `fastapi`, and `redis` are listed.
-
-### Step 5: Verify Project Files
-
-The project includes two main files:
-
-- `celery_app.py`: Defines the Celery setup and a sample task.
-- `main.py`: Runs the FastAPI server with authentication and task endpoints.
-
-Open them in VS Code to explore the code. Don’t edit them unless you want to customize the project.
+**The problem it solves:** Synchronous web servers block on long-running work (image processing, ML inference, report generation). TaskForge routes those jobs to isolated worker processes via a persistent message broker, decoupling request handling from computation time.
 
 ---
 
-## Database Integration
+## Table of Contents
 
-This project now uses an SQLite database named `tasks_and_users.db`, which will be automatically created in the root directory of the project when you first run the application.
+1. [Key Features](#key-features)
+2. [Architecture Overview](#architecture-overview)
+3. [Tech Stack](#tech-stack)
+4. [Getting Started](#getting-started)
+   - [Prerequisites](#prerequisites)
+   - [Installation](#installation)
+   - [Configuration](#configuration)
+5. [Running the Project](#running-the-project)
+6. [Usage](#usage)
+   - [Web Dashboard](#web-dashboard)
+   - [REST API Examples](#rest-api-examples)
+7. [API Reference](#api-reference)
+8. [Monitoring with Flower](#monitoring-with-flower)
+9. [Testing](#testing)
+10. [Security Considerations](#security-considerations)
+11. [Contributing](#contributing)
+12. [License](#license)
 
-This database serves two main purposes:
-1.  **User Authentication:** Stores user credentials. On the first startup, a default test user is created with the following credentials if they don't already exist:
-    *   **Username:** `user1`
-    *   **Password:** `password1`
-    You can use these credentials to obtain an access token for testing.
-2.  **Task Persistence:** Stores details and results of all submitted Celery tasks (e.g., `process_task`, `add_numbers`, `simulate_image_processing`). When you query a task's status via the API, the information is retrieved from this database.
+---
 
-The necessary tables (`users` and `tasks`) are also created automatically if they don't exist when the application starts.
+## Key Features
+
+- 🚀 **Async FastAPI backend** with JWT Bearer authentication and per-IP rate limiting
+- ⚙️ **Celery workers** with priority queues (`default`, `high_priority`) and late acknowledgment for fault tolerance
+- 🗄️ **SQLite persistence** — task results are written directly via Celery signals the instant a worker finishes, independent of client polling
+- 🔄 **Auto-polling dashboard** — the web UI polls task status every 2 seconds and stops automatically on terminal state (SUCCESS / FAILURE / REVOKED)
+- 🛡️ **Proxy-aware rate limiting** — correctly resolves real client IPs behind Nginx, Cloudflare, or any reverse proxy
+- 📊 **Flower integration** for real-time worker and task monitoring
+- 🌱 **12-Factor App config** — all secrets and URLs are read from environment variables
+- 🔁 **Exponential-backoff retries** for transient infrastructure failures
+
+---
+
+## Architecture Overview
+
+```
+Browser / API Client
+        │
+        ▼
+ ┌─────────────┐   JWT Auth    ┌──────────────┐
+ │  FastAPI    │──────────────▶│  SQLite DB   │
+ │  (main.py)  │               │ tasks_and_   │
+ └──────┬──────┘               │  users.db    │
+        │ task.delay()         └──────▲───────┘
+        ▼                             │ Celery signals
+ ┌─────────────┐               ┌──────┴───────┐
+ │    Redis    │◀─────────────▶│  Celery      │
+ │  (Broker +  │               │  Worker(s)   │
+ │   Backend)  │               │ (celery_app) │
+ └─────────────┘               └─────────────┘
+```
+
+1. A client authenticates via `POST /token` and receives a short-lived JWT.
+2. The client submits a task via one of the task endpoints (rate-limited to 5/min per IP).
+3. FastAPI enqueues the job via `task.delay()` and records it in SQLite as `SUBMITTED`.
+4. A Celery worker picks up the job from Redis, executes it, and fires a `task_success` or `task_failure` signal that **immediately** updates the SQLite record.
+5. The client's dashboard auto-polls `/tasks/{task_id}` and displays the live result.
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| **API Framework** | [FastAPI](https://fastapi.tiangolo.com/) 0.115 | Async HTTP endpoints, OpenAPI docs |
+| **Task Queue** | [Celery](https://docs.celeryq.dev/) 5.5 | Background job dispatch and execution |
+| **Message Broker** | [Redis](https://redis.io/) 7 | Task queue transport and result backend |
+| **Database** | [SQLite](https://www.sqlite.org/) + [aiosqlite](https://github.com/omnilib/aiosqlite) | Async task and user persistence |
+| **Authentication** | [python-jose](https://python-jose.readthedocs.io/) + [passlib](https://passlib.readthedocs.io/) | JWT tokens, bcrypt password hashing |
+| **Rate Limiting** | [SlowAPI](https://github.com/laurentS/slowapi) | Per-IP request throttling |
+| **Monitoring** | [Flower](https://flower.readthedocs.io/) | Real-time Celery dashboard |
+| **Server** | [Uvicorn](https://www.uvicorn.org/) | ASGI production server |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Python | 3.12+ | [python.org](https://www.python.org/downloads/) — check "Add Python to PATH" on Windows |
+| Docker Desktop | Latest | [docker.com](https://www.docker.com/products/docker-desktop/) — used to run Redis |
+| Git | Any | [git-scm.com](https://git-scm.com/) |
+
+### Installation
+
+**1. Clone the repository**
+
+```bash
+git clone https://github.com/dhaatrik/distributed-task-queue.git
+cd distributed-task-queue
+```
+
+**2. Start Redis via Docker**
+
+```bash
+docker run -d -p 6379:6379 --name redis-server redis
+```
+
+Verify it's running:
+
+```bash
+docker ps
+# redis-server should appear in the list
+```
+
+**3. Create and activate a virtual environment**
+
+```bash
+# Windows
+python -m venv .venv
+.\.venv\Scripts\activate
+
+# macOS / Linux
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+**4. Install dependencies**
+
+```bash
+pip install -r requirements.txt
+```
+
+### Configuration
+
+Copy the example environment file and fill in any values you want to override:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Default | Required in Production |
+|---|---|---|
+| `APP_SECRET_KEY` | *(auto-generated — invalidated on restart)* | ✅ Yes — use `openssl rand -hex 32` |
+| `DATABASE_URL` | `tasks_and_users.db` | Optional |
+| `CELERY_BROKER_URL` | `redis://localhost:6379/0` | Optional |
+| `CELERY_RESULT_BACKEND` | `redis://localhost:6379/0` | Optional |
+
+> [!WARNING]
+> Do not run in production without setting `APP_SECRET_KEY`. Without it, a new random key is generated on every startup, invalidating all existing JWT tokens.
 
 ---
 
 ## Running the Project
 
-You’ll run three components: Redis (already running in Docker), Celery workers, and the FastAPI server.
+You need **four** terminal sessions. Activate your virtual environment (`.\.venv\Scripts\activate`) in each one.
 
-### Step 1: Start Celery Workers
+**Terminal 1 — Default queue worker**
 
-1. Open a new terminal in VS Code (**Terminal** > **New Terminal**).
-2. Activate the virtual environment:
+```bash
+celery -A celery_app worker -Q default --loglevel=info --pool=solo
+```
 
-   ```
-   .\venv\Scripts\activate
-   ```
-3. Run the worker for the `default` queue:
+**Terminal 2 — High-priority queue worker**
 
-   ```
-   celery -A celery_app worker -Q default --loglevel=info --pool=solo
-   ```
-4. Open another terminal, activate the virtual environment, and run the worker for the `high_priority` queue:
+```bash
+celery -A celery_app worker -Q high_priority --loglevel=info --pool=solo
+```
 
-   ```
-   celery -A celery_app worker -Q high_priority --loglevel=info --pool=solo
-   ```
+> [!NOTE]
+> `--pool=solo` is required on Windows because the default `prefork` pool is not supported. On Linux/macOS you can omit it or use `--pool=prefork`.
 
-   Keep both terminals open.
+**Terminal 3 — FastAPI server**
 
-### Step 2: Start the FastAPI Server
+```bash
+uvicorn main:app --reload
+```
 
-1. Open another terminal in VS Code.
-2. Activate the virtual environment:
+The server starts at **http://127.0.0.1:8000**. The database and default test user are created automatically on first startup.
 
-   ```
-   .\venv\Scripts\activate
-   ```
-3. Run the server:
+**Terminal 4 — Flower (optional monitoring)**
 
-   ```
-   uvicorn main:app --reload
-   ```
+```bash
+celery -A celery_app flower
+```
 
-   You’ll see output like:
+Flower dashboard: **http://localhost:5555**
 
-   ```
-   INFO: Uvicorn running on http://127.0.0.1:8000
-   ```
+**Stopping everything**
 
-   Keep this terminal open.
+```bash
+# Press Ctrl+C in each worker/server terminal, then:
+docker stop redis-server
+```
 
 ---
 
-## Testing the Project
+## Usage
 
-While the following sections describe how to test the system using PowerShell, a simpler Web Interface is now available for interactive testing. See the "Web Interface" section below for details. The PowerShell examples remain valid for scripted testing or direct API interaction.
+### Web Dashboard
 
-Use PowerShell to test the system by sending tasks and checking their status. The project uses authentication, so you’ll need a token first. The default credentials (`user1`/`password1`) are created in the database on first startup, as described in the "Database Integration" section.
+Navigate to **http://127.0.0.1:8000** in your browser.
 
-### Test 1: Get an Access Token
+The dashboard provides three bento-style panels:
 
-1. Open a PowerShell terminal in VS Code.
-2. Run:
+| Panel | Description |
+|---|---|
+| **Process Task** | Submit a generic long-running job (~5 s) |
+| **Add Numbers** | Submit a summation job over a list of floats |
+| **Image Processing** | Simulate an image processing pipeline (~1 s) |
+| **Task Monitor** | Auto-polls every 2 s and displays live status + result |
 
-   ```
-   (Invoke-WebRequest -Uri "http://localhost:8000/token" -Method POST -Headers @{ "Content-Type" = "application/x-www-form-urlencoded" } -Body "username=user1&password=password1").Content | ConvertFrom-Json
-   ```
-3. You’ll see:
+Sign in with the default test credentials:
 
-   ```json
-   {
-       "access_token": "some-long-jwt-token",
-       "token_type": "bearer"
-   }
-   ```
-4. Copy the `access_token`.
+```
+Username: user1
+Password: password1
+```
 
-### Test 2: Submitting Different Task Types
+### REST API Examples
 
-This project now supports multiple task types. Here's how to submit them:
+The interactive API documentation is available at **http://127.0.0.1:8000/docs**.
 
-#### a. Generic Processing Task
+**Step 1 — Authenticate and obtain a token**
 
-This is the original example task.
+```powershell
+# PowerShell
+$response = (Invoke-WebRequest -Uri "http://localhost:8000/token" `
+    -Method POST `
+    -Headers @{ "Content-Type" = "application/x-www-form-urlencoded" } `
+    -Body "username=user1&password=password1").Content | ConvertFrom-Json
 
-1. Run this command, replacing `your-jwt-token` with the token:
+$TOKEN = $response.access_token
+```
 
-   ```powershell
-   (Invoke-WebRequest -Uri "http://localhost:8000/tasks/process" -Method POST -Headers @{ "Authorization" = "Bearer your-jwt-token"; "Content-Type" = "application/json" } -Body '{"data": "example data"}').Content | ConvertFrom-Json
-   ```
-2. You’ll see:
+```bash
+# bash / curl
+TOKEN=$(curl -s -X POST "http://localhost:8000/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=user1&password=password1" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+```
 
-   ```json
-   {
-       "task_id": "some-uuid"
-   }
-   ```
-3. Copy the `task_id` to use in Test 3.
+**Step 2 — Submit a task**
 
-#### b. Process Numbers Task
+```powershell
+# Generic process task (PowerShell)
+$task = (Invoke-WebRequest -Uri "http://localhost:8000/tasks/process" `
+    -Method POST `
+    -Headers @{ "Authorization" = "Bearer $TOKEN"; "Content-Type" = "application/json" } `
+    -Body '{"data": "hello world"}').Content | ConvertFrom-Json
 
-This task accepts a list of numbers and returns their sum.
+$TASK_ID = $task.task_id
+```
 
--   **Endpoint**: `POST /tasks/process-numbers`
--   **Authentication**: Required (Bearer Token).
--   **Request Body**: JSON object with a `numbers` key (array of numbers).
-    Example:
-    ```powershell
-    (Invoke-WebRequest -Uri "http://localhost:8000/tasks/process-numbers" -Method POST -Headers @{ "Authorization" = "Bearer your-jwt-token"; "Content-Type" = "application/json" } -Body '{"numbers": [1, 2, 3.5, 10]}').Content | ConvertFrom-Json
-    ```
--   **Response**: JSON object with `task_id`.
-    ```json
-    {
-        "task_id": "some-other-uuid"
-    }
-    ```
-    Copy this `task_id` to check its status using the method in Test 3. The expected result, retrieved from the database, would be `{"task_id": "some-other-uuid", "name": "add_numbers", "status": "SUCCESS", "result": "16.5", ...}`. (Note: The exact structure and `status` field value might vary based on Celery version and DB schema).
+```bash
+# Add numbers task (bash)
+TASK_ID=$(curl -s -X POST "http://localhost:8000/tasks/process-numbers" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"numbers": [1, 2, 3.5, 10]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['task_id'])")
+```
 
-#### c. Simulate Image Processing Task
+**Step 3 — Poll task status**
 
-This task accepts an image identifier (string) and simulates processing.
+```powershell
+# PowerShell
+(Invoke-WebRequest -Uri "http://localhost:8000/tasks/$TASK_ID" `
+    -Headers @{ "Authorization" = "Bearer $TOKEN" }).Content | ConvertFrom-Json
+```
 
--   **Endpoint**: `POST /tasks/process-image`
--   **Authentication**: Required (Bearer Token).
--   **Request Body**: JSON object with an `image_id` key (string).
-    Example:
-    ```powershell
-    (Invoke-WebRequest -Uri "http://localhost:8000/tasks/process-image" -Method POST -Headers @{ "Authorization" = "Bearer your-jwt-token"; "Content-Type" = "application/json" } -Body '{"image_id": "img_123.jpg"}').Content | ConvertFrom-Json
-    ```
--   **Response**: JSON object with `task_id`.
-    ```json
-    {
-        "task_id": "yet-another-uuid"
-    }
-    ```
-    Copy this `task_id` to check its status. The expected result, retrieved from the database, would be `{"task_id": "yet-another-uuid", "name": "simulate_image_processing", "status": "SUCCESS", "result": "Image img_123.jpg processed successfully.", ...}`.
+```bash
+# bash
+curl -s "http://localhost:8000/tasks/$TASK_ID" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+```
 
-### Test 3: Check Task Status
+**Example success response:**
 
-This endpoint now retrieves task information directly from the SQLite database.
-
-1. Wait for the task to process (e.g., 5 seconds for the original generic task, 1 second for image processing).
-2. Run, replacing `some-uuid` and `your-jwt-token`:
-
-   ```
-   (Invoke-WebRequest -Uri "http://localhost:8000/tasks/some-uuid" -Method GET -Headers @{ "Authorization" = "Bearer your-jwt-token" }).Content | ConvertFrom-Json
-   ```
-3. You’ll see:
-   - If still processing:
-
-     ```json
-     {
-         "status": "pending"
-     }
-     ```
-   - If done:
-
-     ```json
-     {
-         "task_id": "some-uuid",
-         "name": "process_task", 
-         "status": "SUCCESS", // Or other status like PENDING, FAILURE
-         "result": "Processed: example data",
-         "created_at": "YYYY-MM-DDTHH:MM:SS.ffffff",
-         "completed_at": "YYYY-MM-DDTHH:MM:SS.ffffff" // Or null if pending/failed
-     }
-     ```
-     The exact fields returned will match the `TaskResultModel` and the data stored in the `tasks` table.
+```json
+{
+    "task_id": "3b6a1e2d-...",
+    "name": "add_numbers",
+    "status": "SUCCESS",
+    "result": "16.5",
+    "created_at": "2026-04-15T03:00:00.000000",
+    "completed_at": "2026-04-15T03:00:00.412381"
+}
+```
 
 ---
 
-## Web Interface
+## API Reference
 
-A simple web interface is available to interact with the task submission system. Once the FastAPI server is running, you can access this UI by navigating to:
+All task endpoints require a `Authorization: Bearer <token>` header.
 
-[http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+| Method | Endpoint | Auth | Rate Limit | Description |
+|---|---|---|---|---|
+| `POST` | `/token` | ❌ | — | Exchange credentials for a JWT |
+| `GET` | `/` | ❌ | — | Serve the web dashboard |
+| `POST` | `/tasks/process` | ✅ | 5/min | Submit a generic processing task |
+| `POST` | `/tasks/process-numbers` | ✅ | 5/min | Submit a number summation task |
+| `POST` | `/tasks/process-image` | ✅ | 5/min | Submit an image processing task |
+| `GET` | `/tasks/{task_id}` | ✅ | — | Fetch the current status and result of a task |
 
-The interface provides the following functionalities:
+**Request bodies:**
 
-1.  **User Login:**
-    *   Enter your credentials to obtain an API token.
-    *   For initial testing, you can use the default user:
-        *   **Username:** `user1`
-        *   **Password:** `password1`
-    *   The obtained API token will be displayed and used automatically for subsequent requests.
+```jsonc
+// POST /tasks/process
+{ "data": "any string payload" }
 
-2.  **Task Submission:**
-    *   Once logged in, forms will appear for submitting each type of supported task:
-        *   Generic Process Task
-        *   Add Numbers Task
-        *   Simulate Image Processing Task
-    *   Fill in the required data and click the respective submit button.
-    *   The API response, including the `task_id`, will be displayed.
+// POST /tasks/process-numbers
+{ "numbers": [1, 2, 3.5, 10] }
 
-3.  **Check Task Status:**
-    *   Enter a `task_id` obtained from a task submission.
-    *   Click "Check Status" to retrieve and display the latest status and result for that task from the database.
+// POST /tasks/process-image
+{ "image_id": "photo_001.jpg" }
+```
 
-This web UI offers a more user-friendly way to test and use the task queue compared to command-line tools.
-
----
-
-## Monitoring Tasks with Flower
-
-Flower is a web dashboard to see your tasks in action.
-
-1. Open a new terminal in VS Code.
-2. Activate the virtual environment:
-
-   ```
-   .\venv\Scripts\activate
-   ```
-3. Run Flower:
-
-   ```
-   celery -A celery_app flower
-   ```
-4. Open your browser and go to `http://localhost:5555`.
-5. You’ll see a dashboard showing your workers and tasks.
+**Task status values:** `SUBMITTED` → `STARTED` → `SUCCESS` | `FAILURE` | `REVOKED`
 
 ---
 
-## Stopping the Project
+## Monitoring with Flower
 
-When you’re done, stop all services:
+Flower provides a real-time browser dashboard for your Celery cluster.
 
-1. **Celery Workers**: Press `Ctrl + C` in each worker terminal.
-2. **FastAPI Server**: Press `Ctrl + C` in the Uvicorn terminal.
-3. **Flower**: Press `Ctrl + C` in the Flower terminal.
-4. **Redis**: In a Command Prompt, run:
+```bash
+celery -A celery_app flower
+```
 
+Visit **http://localhost:5555** to see:
+
+- Active, reserved, and completed tasks
+- Per-worker throughput and concurrency
+- Task arguments, return values, and execution times
+- Ability to revoke (cancel) pending tasks
+
+---
+
+## Testing
+
+The project currently ships with manual API tests. Automated test coverage is tracked as a future improvement.
+
+**Manual smoke test (PowerShell)**
+
+Run all three task types end-to-end with a single script:
+
+```powershell
+# 1. Authenticate
+$token = ((Invoke-WebRequest -Uri "http://localhost:8000/token" -Method POST `
+    -Headers @{"Content-Type"="application/x-www-form-urlencoded"} `
+    -Body "username=user1&password=password1").Content | ConvertFrom-Json).access_token
+
+$headers = @{ "Authorization" = "Bearer $token"; "Content-Type" = "application/json" }
+
+# 2. Submit all three task types
+$g = ((Invoke-WebRequest -Uri "http://localhost:8000/tasks/process"         -Method POST -Headers $headers -Body '{"data":"smoke-test"}').Content        | ConvertFrom-Json).task_id
+$n = ((Invoke-WebRequest -Uri "http://localhost:8000/tasks/process-numbers" -Method POST -Headers $headers -Body '{"numbers":[1,2,3]}').Content           | ConvertFrom-Json).task_id
+$i = ((Invoke-WebRequest -Uri "http://localhost:8000/tasks/process-image"   -Method POST -Headers $headers -Body '{"image_id":"test.jpg"}').Content       | ConvertFrom-Json).task_id
+
+Write-Host "Tasks submitted: generic=$g numbers=$n image=$i"
+
+# 3. Poll until complete (image task finishes fastest)
+Start-Sleep -Seconds 6
+foreach ($id in @($g, $n, $i)) {
+    ((Invoke-WebRequest -Uri "http://localhost:8000/tasks/$id" `
+        -Headers @{ "Authorization" = "Bearer $token" }).Content | ConvertFrom-Json) | Format-List
+}
+```
+
+**Validate the interactive docs**
+
+Open **http://127.0.0.1:8000/docs** — the auto-generated OpenAPI UI lets you try every endpoint directly in the browser.
+
+**Verify Celery signals write to the database without polling**
+
+1. Submit a task and note the task ID.
+2. Wait for the expected processing duration.
+3. Query `/tasks/{task_id}` — the status should already be `SUCCESS` or `FAILURE` without any intermediate polling, because the worker's signal handler updates the database directly.
+
+---
+
+## Security Considerations
+
+| Risk | Mitigation |
+|---|---|
+| **Weak JWT secret** | Set `APP_SECRET_KEY` to a cryptographically random 256-bit value (`openssl rand -hex 32`). A temporary key is generated at startup if unset — all tokens are invalidated on restart. |
+| **Credential exposure** | `.env` and `*.db` are gitignored. Never commit secrets to version control. |
+| **SQL injection** | All database operations use parameterized queries via `aiosqlite`. |
+| **Rate limit bypass via proxy** | `get_proxied_address()` reads `X-Forwarded-For` then `X-Real-IP` before falling back to the direct remote address. |
+| **Replay / CSRF** | Short-lived JWTs (30-minute TTL) mitigate replay attacks. Add explicit CSRF protection if you move to cookie-based auth. |
+| **Task double-execution** | `task_acks_late = True` improves fault tolerance but means a worker crash may re-run a task. Ensure your tasks are **idempotent** in production. |
+| **Broker exposure** | Secure Redis with a password in `CELERY_BROKER_URL`, restrict network access via firewall rules, and use `rediss://` (TLS) over untrusted networks. |
+| **Dependency vulnerabilities** | Regularly run `pip-audit` or Snyk against `requirements.txt` and keep packages patched. |
+
+---
+
+## Contributing
+
+Contributions, issues, and feature requests are welcome.
+
+1. **Fork** the repository and create a feature branch:
+
+   ```bash
+   git checkout -b feature/your-feature-name
    ```
-   docker stop redis-server
-   ```
 
-To restart later, follow the “Running the Project” steps.
+2. **Make your changes** — keep commits small and focused.
+3. **Write tests** for new behaviour where applicable.
+4. **Ensure the app starts cleanly** and the smoke-test script passes.
+5. **Open a Pull Request** with a clear description of the problem and solution.
 
----
+Please follow the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) in all interactions.
 
-## Troubleshooting
-
-- **Redis not running**: Check with `docker ps`. Restart with `docker start redis-server`.
-- **FastAPI errors**: Ensure all dependencies are installed (`pip install -r requirements.txt`).
-- **Task not processing**: Verify both Celery workers are running.
-- **PowerShell errors**: Double-check token and task ID in commands.
-- **Need help?**: Ask on GitHub Issues or check Stack Overflow.
+For bug reports and feature suggestions, please [open an issue](https://github.com/dhaatrik/distributed-task-queue/issues).
 
 ---
 
-## What’s Next?
+## License
 
-You’ve built a cool system! Here are ideas to make it better:
+This project is released under the **MIT License** — see the [LICENSE](LICENSE) file for full details.
 
-- Add more tasks in `celery_app.py` (e.g., process numbers or images).
-- Connect a database to store task results.
-- Create a web page to submit tasks instead of PowerShell.
+You are free to use, modify, and distribute this software in any project, commercial or otherwise, provided the original copyright notice is preserved.
 
 ---
 
-## Acknowledgments
+<div align="center">
 
-Built with the help from Grok 3 (created by xAI). Thanks for trying my project!
+Built by [Dhaatrik Chowdhury](https://github.com/dhaatrik) · Powered by FastAPI, Celery & Redis
 
-## Security Recommendations
-
-This section outlines important security considerations for this application:
-
-1.  **Dependency Vulnerability Scanning:**
-    *   Regularly scan `requirements.txt` and all dependencies for known vulnerabilities using tools like `pip-audit`, Snyk, or Trivy. Keep dependencies updated to patched versions.
-
-2.  **CSRF Protection:**
-    *   While JWTs are used (which can offer some CSRF protection if tokens are not stored in client-side JavaScript accessible cookies), consider implementing explicit CSRF protection mechanisms, especially if session cookies are used or if there are concerns about token handling.
-
-3.  **Production Error Handling:**
-    *   Ensure that detailed error messages or stack traces, which might reveal sensitive system information, are not exposed to clients in a production environment. Implement robust error handling that logs details server-side but shows generic error messages to users.
-
-4.  **Idempotent Celery Tasks:**
-    *   The Celery configuration in `celery_app.py` uses `task_acks_late = True`. This enhances fault tolerance but means a task could potentially be executed more than once if a worker fails after starting a task but before acknowledging its completion. Ensure that all Celery tasks (like `process_task`) are designed to be idempotent, meaning they can be safely executed multiple times with the same input without causing unintended side effects.
-
-5.  **Secret Management:**
-    *   The `SECRET_KEY` for JWT signing in `main.py` has been modified to be loaded from the `APP_SECRET_KEY` environment variable. Ensure this environment variable is set to a strong, unique, randomly generated key in your production environment. Do not commit the actual secret key to version control.
-
-6.  **Database Security:**
-    *   The application has been updated to remove the hardcoded `fake_users_db`. When integrating a real database for user authentication and other data storage:
-        *   Use strong, unique credentials for database access.
-        *   Limit database user privileges to the minimum required.
-        *   Consider network ACLs or firewalls to restrict database access.
-        *   Use Object-Relational Mappers (ORMs) or parameterized queries to prevent SQL injection vulnerabilities.
-
-7.  **Celery Broker/Backend Security:**
-    *   As noted in `celery_app.py`, secure your Celery broker and backend (e.g., Redis) with passwords, network restrictions, and potentially SSL/TLS if accessed over untrusted networks.
-
-8.  **Rate Limiting with Proxies:**
-    *   As noted in `main.py`, if deploying behind a reverse proxy, ensure the rate limiting mechanism correctly identifies client IPs by checking headers like `X-Forwarded-For`.
-
-## New Task Endpoints
-
-These tasks require authentication (Bearer Token).
-
-### Process Numbers Task
-- **Endpoint:** `POST /tasks/process-numbers`
-- **Description:** Accepts a list of numbers and returns their sum.
-- **Request Body:** JSON object with a `numbers` key (array of numbers).
-  ```json
-  {
-      "numbers": [1, 2, 3.5, 4]
-  }
-  ```
-- **Response:** JSON object with `task_id`.
-  ```json
-  {
-      "task_id": "some-celery-task-id"
-  }
-  ```
-- **Result via `/tasks/{task_id}`:** The sum of the numbers, retrieved from the database.
-
-### Simulate Image Processing Task
-- **Endpoint:** `POST /tasks/process-image`
-- **Description:** Accepts an image identifier (string) and simulates processing.
-- **Request Body:** JSON object with an `image_id` key (string).
-  ```json
-  {
-      "image_id": "image_example_001.png"
-  }
-  ```
-- **Response:** JSON object with `task_id`.
-  ```json
-  {
-      "task_id": "another-celery-task-id"
-  }
-  ```
-- **Result via `/tasks/{task_id}`:** A message like "Image image_example_001.png processed successfully.", retrieved from the database.
+</div>
