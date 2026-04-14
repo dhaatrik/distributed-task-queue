@@ -3,219 +3,893 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Submission UI</title>
+    <title>TaskForge — Distributed Task Queue</title>
+    <meta name="description" content="A real-time distributed task processing dashboard built on Celery and FastAPI. Submit, track, and monitor background tasks with ease.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
-        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h2, h3 { color: #333; }
-        label { display: block; margin-top: 10px; font-weight: bold; }
-        input[type="text"], input[type="password"], textarea, input[type="number"] {
-            width: calc(100% - 22px); padding: 10px; margin-top: 5px; border-radius: 4px; border: 1px solid #ddd;
+        /* ==================== DESIGN TOKENS ==================== */
+        :root {
+            --bg:             #080b14;
+            --surface:        rgba(255, 255, 255, 0.04);
+            --surface-hover:  rgba(255, 255, 255, 0.07);
+            --border:         rgba(255, 255, 255, 0.08);
+            --border-active:  rgba(167, 139, 250, 0.5);
+
+            --accent:         #7c3aed;
+            --accent-light:   #a78bfa;
+            --accent-dim:     rgba(124, 58, 237, 0.15);
+            --accent-glow:    rgba(124, 58, 237, 0.35);
+
+            --text-primary:   #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted:     #475569;
+
+            --success:        #10b981;
+            --success-dim:    rgba(16, 185, 129, 0.15);
+            --warning:        #f59e0b;
+            --warning-dim:    rgba(245, 158, 11, 0.15);
+            --error:          #ef4444;
+            --error-dim:      rgba(239, 68, 68, 0.15);
+            --info:           #3b82f6;
+            --info-dim:       rgba(59, 130, 246, 0.15);
+
+            --radius-sm:  8px;
+            --radius-md:  14px;
+            --radius-lg:  20px;
+            --radius-xl:  28px;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        button {
-            background-color: #007bff; color: white; padding: 10px 15px; border: none;
-            border-radius: 4px; cursor: pointer; margin-top: 15px; font-size: 16px;
+
+        /* ==================== RESET & BASE ==================== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
         }
-        button:hover { background-color: #0056b3; }
-        .task-form { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-        #apiToken, #taskResponse, #statusResponse {
-            margin-top: 10px; padding: 10px; background-color: #e9ecef; border-radius: 4px;
-            white-space: pre-wrap; word-wrap: break-word;
+
+        /* Ambient gradient background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 20% 10%, rgba(124, 58, 237, 0.12) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 80% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
         }
-        .hidden { display: none; }
+
+        /* ==================== LAYOUT ==================== */
+        #app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+        /* ==================== LOGIN VIEW ==================== */
+        #loginView {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+            animation: fadeIn 0.6s ease both;
+        }
+
+        .login-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 48px 40px;
+            width: 100%;
+            max-width: 420px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+        }
+
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+
+        .brand-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, var(--accent), #4f46e5);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 4px 16px var(--accent-glow);
+            flex-shrink: 0;
+        }
+
+        .brand-name {
+            font-size: 22px; font-weight: 700; letter-spacing: -0.3px;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-light));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+
+        .brand-tagline { font-size: 11px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+
+        .login-title { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
+        .login-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 32px; }
+
+        /* ==================== FORM ELEMENTS ==================== */
+        .field { margin-bottom: 16px; }
+
+        .field label {
+            display: block; font-size: 12px; font-weight: 600;
+            color: var(--text-secondary); margin-bottom: 6px;
+            letter-spacing: 0.3px; text-transform: uppercase;
+        }
+
+        .field input, .field textarea {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            padding: 10px 14px;
+            outline: none;
+            transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+            resize: none;
+        }
+
+        .field input::placeholder, .field textarea::placeholder { color: var(--text-muted); }
+
+        .field input:focus, .field textarea:focus {
+            border-color: var(--border-active);
+            background: rgba(167, 139, 250, 0.06);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+        }
+
+        /* ==================== BUTTONS ==================== */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            border: none; border-radius: var(--radius-sm); cursor: pointer;
+            font-family: inherit; font-size: 14px; font-weight: 600;
+            padding: 10px 18px; transition: all var(--transition); white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #5b21b6);
+            color: white;
+            box-shadow: 0 4px 14px var(--accent-glow);
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px var(--accent-glow); filter: brightness(1.1); }
+        .btn-primary:active:not(:disabled) { transform: translateY(0); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-secondary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        .btn-secondary:hover { background: var(--surface-hover); border-color: var(--border-active); }
+
+        .btn-ghost { background: transparent; color: var(--text-secondary); font-size: 13px; padding: 6px 10px; }
+        .btn-ghost:hover { color: var(--text-primary); background: var(--surface-hover); }
+
+        .btn-full { width: 100%; }
+        .btn-sm { font-size: 12px; padding: 6px 12px; }
+
+        /* ==================== ALERTS ==================== */
+        .alert { border-radius: var(--radius-sm); font-size: 13px; padding: 10px 14px; margin-top: 12px; display: none; }
+        .alert.visible { display: block; }
+        .alert-error { background: var(--error-dim); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; }
+
+        /* ==================== DASHBOARD ==================== */
+        #dashboardView {
+            display: none; flex-direction: column;
+            min-height: 100vh; padding: 24px;
+        }
+        #dashboardView.visible { display: flex; }
+
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 28px;
+        }
+
+        .header-brand { display: flex; align-items: center; gap: 10px; }
+
+        .header-brand-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--accent), #4f46e5);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            font-size: 18px; box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .header-brand-name {
+            font-size: 18px; font-weight: 700;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-light));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+
+        .header-right { display: flex; align-items: center; gap: 12px; }
+
+        .user-badge {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 100px; padding: 6px 12px 6px 6px;
+            font-size: 13px; color: var(--text-secondary);
+        }
+
+        .user-avatar {
+            width: 24px; height: 24px;
+            background: linear-gradient(135deg, var(--accent), #4f46e5);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 700; color: white; flex-shrink: 0;
+        }
+
+        /* ==================== BENTO GRID ==================== */
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            flex: 1;
+        }
+
+        .bento-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bento-card:hover {
+            border-color: rgba(167, 139, 250, 0.22);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            transform: translateY(-2px);
+        }
+
+        .bento-card-full { grid-column: 1 / -1; }
+
+        .card-header {
+            display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px;
+        }
+
+        .card-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; flex-shrink: 0;
+        }
+        .icon-purple { background: var(--accent-dim); }
+        .icon-blue   { background: rgba(59, 130, 246, 0.15); }
+        .icon-green  { background: rgba(16, 185, 129, 0.15); }
+        .icon-amber  { background: rgba(245, 158, 11, 0.15); }
+
+        .card-title-block { flex: 1; min-width: 0; }
+        .card-title { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; margin-bottom: 2px; }
+        .card-desc  { font-size: 12px; color: var(--text-muted); }
+
+        .card-body  { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+
+        .card-footer {
+            margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ==================== STATUS MONITOR ==================== */
+        .monitor-layout { display: flex; gap: 16px; flex: 1; min-height: 0; }
+
+        .monitor-main { flex: 2; min-width: 0; display: flex; flex-direction: column; }
+
+        .status-task-bar { display: flex; gap: 10px; align-items: flex-end; }
+        .status-task-bar .field { flex: 1; margin: 0; }
+
+        .status-result {
+            margin-top: 14px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-height: 100px;
+            max-height: 280px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-empty {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            flex: 1; gap: 8px; color: var(--text-muted);
+            font-family: 'Inter', sans-serif; font-size: 13px;
+        }
+        .status-empty-icon { font-size: 28px; opacity: 0.4; }
+
+        /* ==================== POLLING / SPINNER ==================== */
+        .polling-header {
+            display: flex; align-items: center; gap: 8px;
+            font-family: 'Inter', sans-serif; font-size: 12px; color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .spinner {
+            display: inline-block; width: 12px; height: 12px;
+            border: 2px solid rgba(167, 139, 250, 0.3);
+            border-top-color: var(--accent-light);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+
+        .polling-live-badge {
+            display: none; align-items: center; gap: 6px;
+            font-size: 12px; color: var(--accent-light);
+        }
+        .polling-live-badge.visible { display: flex; }
+
+        /* ==================== STATUS BADGES ==================== */
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 100px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            font-family: 'Inter', sans-serif;
+        }
+        .badge-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+        .status-SUBMITTED, .status-PENDING { background: var(--info-dim); color: #93c5fd; }
+        .status-SUBMITTED .badge-dot, .status-PENDING .badge-dot { background: var(--info); }
+        .status-STARTED   { background: var(--warning-dim); color: #fcd34d; }
+        .status-STARTED .badge-dot { background: var(--warning); animation: pulse-dot 1.2s ease infinite; }
+        .status-SUCCESS   { background: var(--success-dim); color: #6ee7b7; }
+        .status-SUCCESS .badge-dot { background: var(--success); }
+        .status-FAILURE, .status-REVOKED { background: var(--error-dim); color: #fca5a5; }
+        .status-FAILURE .badge-dot, .status-REVOKED .badge-dot { background: var(--error); }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.75); }
+        }
+
+        .status-live-row {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+        }
+
+        /* ==================== RECENT TASKS SIDEBAR ==================== */
+        .recent-panel { flex: 1; min-width: 170px; display: flex; flex-direction: column; }
+
+        .recent-label {
+            font-size: 11px; font-weight: 600; color: var(--text-secondary);
+            margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .task-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+
+        .task-item {
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(255,255,255,0.025);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 8px 10px; font-size: 12px;
+            cursor: pointer;
+            transition: background var(--transition), border-color var(--transition);
+        }
+        .task-item:hover { background: var(--surface-hover); border-color: rgba(167,139,250,0.2); }
+
+        .task-item-id {
+            font-family: monospace; color: var(--text-muted); flex: 1;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px;
+        }
+        .task-item-name { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+
+        /* ==================== ANIMATIONS ==================== */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in { animation: slideInUp 0.3s ease both; }
+
+        /* ==================== SCROLLBAR ==================== */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        /* ==================== RESPONSIVE ==================== */
+        @media (max-width: 900px) {
+            .bento-grid { grid-template-columns: 1fr 1fr; }
+            .monitor-layout { flex-direction: column; }
+            .recent-panel { min-width: 0; }
+        }
+        @media (max-width: 600px) {
+            .bento-grid { grid-template-columns: 1fr; }
+            .login-card { padding: 32px 24px; }
+            #dashboardView { padding: 16px; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Task Submission Interface</h2>
+<div id="app">
 
-        <!-- Login Section -->
-        <div class="task-form">
-            <h3>User Login</h3>
-            <label for="username">Username:</label>
-            <input type="text" id="username" name="username" value="user1">
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password" value="password1">
-            <button id="loginButton">Login</button>
-            <h4>API Token:</h4>
-            <pre id="apiToken"></pre>
-        </div>
-
-        <!-- Task Submission Forms (initially hidden) -->
-        <div id="taskFormsContainer" class="hidden">
-            <!-- Generic Process Task -->
-            <div class="task-form">
-                <h3>Submit Generic Task</h3>
-                <label for="genericData">Data:</label>
-                <textarea id="genericData" name="genericData">Sample task data</textarea>
-                <button onclick="submitTask('process_task', {data: document.getElementById('genericData').value})">Submit Generic Task</button>
+    <!-- ==================== LOGIN VIEW ==================== -->
+    <div id="loginView">
+        <div class="login-card">
+            <div class="brand">
+                <div class="brand-icon">⚡</div>
+                <div>
+                    <div class="brand-name">TaskForge</div>
+                    <div class="brand-tagline">Distributed Task Queue</div>
+                </div>
             </div>
 
-            <!-- Add Numbers Task -->
-            <div class="task-form">
-                <h3>Submit Add Numbers Task</h3>
-                <label for="numbersData">Numbers (comma-separated):</label>
-                <input type="text" id="numbersData" name="numbersData" value="1,2,3.5,4">
-                <button onclick="submitTask('add_numbers', {numbers: document.getElementById('numbersData').value.split(',').map(Number)})">Submit Add Numbers Task</button>
-            </div>
+            <h1 class="login-title">Welcome back</h1>
+            <p class="login-subtitle">Sign in to manage and monitor your background tasks.</p>
 
-            <!-- Simulate Image Processing Task -->
-            <div class="task-form">
-                <h3>Submit Image Processing Task</h3>
-                <label for="imageData">Image ID:</label>
-                <input type="text" id="imageData" name="imageData" value="image_test_001.jpg">
-                <button onclick="submitTask('simulate_image_processing', {image_id: document.getElementById('imageData').value})">Submit Image Task</button>
-            </div>
-
-            <h4>Last Task Submission Response:</h4>
-            <pre id="taskResponse"></pre>
-        </div>
-
-        <!-- Task Status Section (initially hidden) -->
-        <div id="taskStatusContainer" class="hidden">
-            <h3>Check Task Status</h3>
-            <label for="taskIdInput">Task ID:</label>
-            <input type="text" id="taskIdInput" name="taskIdInput">
-            <button id="checkStatusButton">Check Status</button>
-            <h4>Task Status:</h4>
-            <pre id="statusResponse"></pre>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="field">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="user1" value="user1" autocomplete="username" required>
+                </div>
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="••••••••" value="password1" autocomplete="current-password" required>
+                </div>
+                <div class="alert alert-error" id="loginError" role="alert"></div>
+                <button type="submit" id="loginButton" class="btn btn-primary btn-full" style="margin-top:20px;">
+                    Sign in
+                </button>
+            </form>
         </div>
     </div>
 
-    <script>
-    let apiToken = null;
+    <!-- ==================== DASHBOARD VIEW ==================== -->
+    <div id="dashboardView">
 
-    const loginButton = document.getElementById('loginButton');
-    const taskFormsContainer = document.getElementById('taskFormsContainer');
-    const taskStatusContainer = document.getElementById('taskStatusContainer');
-    const apiTokenDisplay = document.getElementById('apiToken');
-    const taskResponseDisplay = document.getElementById('taskResponse');
-    const statusResponseDisplay = document.getElementById('statusResponse');
-    const checkStatusButton = document.getElementById('checkStatusButton');
+        <header class="header">
+            <div class="header-brand">
+                <div class="header-brand-icon">⚡</div>
+                <span class="header-brand-name">TaskForge</span>
+            </div>
+            <div class="header-right">
+                <div class="user-badge">
+                    <div class="user-avatar" id="userAvatar">U</div>
+                    <span id="usernameBadge">user1</span>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="logoutButton" onclick="handleLogout()">Sign out</button>
+            </div>
+        </header>
 
-    // Login functionality
-    loginButton.addEventListener('click', async () => {
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-        
-        const formData = new URLSearchParams();
-        formData.append('username', username);
-        formData.append('password', password);
+        <main class="bento-grid" id="bentoGrid">
 
-        try {
-            const response = await fetch('/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData
-            });
+            <!-- Card 1: Generic Process Task -->
+            <div class="bento-card" id="card-generic">
+                <div class="card-header">
+                    <div class="card-icon icon-purple">🔄</div>
+                    <div class="card-title-block">
+                        <div class="card-title">Process Task</div>
+                        <div class="card-desc">Generic long-running job (~5 s)</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="field">
+                        <label for="genericData">Payload</label>
+                        <textarea id="genericData" rows="3" placeholder="Enter task data…">Sample task data</textarea>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary btn-full" id="submitGenericBtn" onclick="submitTask('process_task')">
+                        Submit Task
+                    </button>
+                </div>
+            </div>
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-            }
+            <!-- Card 2: Add Numbers Task -->
+            <div class="bento-card" id="card-numbers">
+                <div class="card-header">
+                    <div class="card-icon icon-blue">➕</div>
+                    <div class="card-title-block">
+                        <div class="card-title">Add Numbers</div>
+                        <div class="card-desc">Sum a list of numeric values</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="field">
+                        <label for="numbersData">Numbers (comma-separated)</label>
+                        <input type="text" id="numbersData" placeholder="1, 2, 3.5, 4" value="1,2,3.5,4">
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary btn-full" id="submitNumbersBtn" onclick="submitTask('add_numbers')">
+                        Submit Task
+                    </button>
+                </div>
+            </div>
 
-            const data = await response.json();
-            apiToken = data.access_token;
-            apiTokenDisplay.textContent = `Bearer ${apiToken}`;
-            taskFormsContainer.classList.remove('hidden');
-            taskStatusContainer.classList.remove('hidden');
-            loginButton.textContent = 'Login Successful';
-            loginButton.disabled = true;
-        } catch (error) {
-            console.error('Login error:', error);
-            apiTokenDisplay.textContent = `Error: ${error.message}`;
-            apiToken = null;
-            taskFormsContainer.classList.add('hidden');
-            taskStatusContainer.classList.add('hidden');
-        }
-    });
+            <!-- Card 3: Image Processing Task -->
+            <div class="bento-card" id="card-image">
+                <div class="card-header">
+                    <div class="card-icon icon-green">🖼️</div>
+                    <div class="card-title-block">
+                        <div class="card-title">Image Processing</div>
+                        <div class="card-desc">Simulate image pipeline (~1 s)</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="field">
+                        <label for="imageData">Image ID</label>
+                        <input type="text" id="imageData" placeholder="image_001.jpg" value="image_test_001.jpg">
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary btn-full" id="submitImageBtn" onclick="submitTask('simulate_image_processing')">
+                        Submit Task
+                    </button>
+                </div>
+            </div>
 
-    // Generic function to submit tasks
-    async function submitTask(taskType, taskPayload) {
-        if (!apiToken) {
-            taskResponseDisplay.textContent = 'Error: Not logged in. Please login first.';
-            return;
-        }
+            <!-- Card 4: Task Monitor (full-width bento card) -->
+            <div class="bento-card bento-card-full" id="card-monitor">
+                <div class="card-header">
+                    <div class="card-icon icon-amber">📡</div>
+                    <div class="card-title-block">
+                        <div class="card-title">Task Monitor</div>
+                        <div class="card-desc">Auto-polls every 2 s — stops automatically on terminal state</div>
+                    </div>
+                    <div class="polling-live-badge" id="pollingBadge">
+                        <span class="spinner"></span>
+                        <span>Live</span>
+                    </div>
+                </div>
 
-        let endpoint = '';
-        switch (taskType) {
-            case 'process_task':
-                endpoint = '/tasks/process';
-                break;
-            case 'add_numbers':
-                endpoint = '/tasks/process-numbers';
-                break;
-            case 'simulate_image_processing':
-                endpoint = '/tasks/process-image';
-                break;
-            default:
-                taskResponseDisplay.textContent = 'Error: Unknown task type.';
-                return;
-        }
+                <div class="monitor-layout">
+                    <!-- Left: task lookup + live result -->
+                    <div class="monitor-main">
+                        <div class="status-task-bar">
+                            <div class="field">
+                                <label for="taskIdInput">Task ID</label>
+                                <input type="text" id="taskIdInput" placeholder="Paste a Task ID or submit a task above…">
+                            </div>
+                            <button class="btn btn-secondary" id="checkStatusButton"
+                                    style="height:40px; flex-shrink:0; margin-top:22px;"
+                                    onclick="manualCheckStatus()">
+                                Check
+                            </button>
+                        </div>
+                        <div class="status-result" id="statusResult">
+                            <div class="status-empty">
+                                <span class="status-empty-icon">🔍</span>
+                                <span>Submit a task or paste a Task ID to see live results here.</span>
+                            </div>
+                        </div>
+                    </div>
 
-        try {
-            taskResponseDisplay.textContent = 'Submitting task...';
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiToken}`
-                },
-                body: JSON.stringify(taskPayload)
-            });
+                    <!-- Right: recent tasks sidebar -->
+                    <div class="recent-panel">
+                        <div class="recent-label">Recent Tasks</div>
+                        <div class="task-list" id="recentTasksList">
+                            <div style="font-size:12px; color:var(--text-muted); text-align:center; padding:20px 0;">
+                                No tasks yet.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-            }
+        </main>
+    </div>
+</div>
 
-            const data = await response.json();
-            taskResponseDisplay.textContent = JSON.stringify(data, null, 2);
-            // Optionally auto-fill task ID input
-            if (data.task_id) {
-                document.getElementById('taskIdInput').value = data.task_id;
-            }
-        } catch (error) {
-            console.error('Task submission error:', error);
-            taskResponseDisplay.textContent = `Error: ${error.message}`;
-        }
+<script>
+// ==================== STATE ====================
+let apiToken       = null;
+let currentUser    = null;
+let pollingInterval = null;
+let activePollingId = null;
+
+const recentTasks = []; // { id, name, status }[]
+
+// ==================== ELEMENT REFS ====================
+const loginView       = document.getElementById('loginView');
+const dashboardView   = document.getElementById('dashboardView');
+const loginError      = document.getElementById('loginError');
+const loginButton     = document.getElementById('loginButton');
+const usernameBadge   = document.getElementById('usernameBadge');
+const userAvatar      = document.getElementById('userAvatar');
+const statusResult    = document.getElementById('statusResult');
+const taskIdInput     = document.getElementById('taskIdInput');
+const pollingBadge    = document.getElementById('pollingBadge');
+const recentTasksList = document.getElementById('recentTasksList');
+
+// ==================== HELPERS ====================
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function makeStatusBadge(s) {
+    const safe = escapeHtml(s || 'UNKNOWN');
+    return `<span class="status-badge status-${safe}"><span class="badge-dot"></span>${safe}</span>`;
+}
+
+function showAlert(el, msg) { el.textContent = msg; el.classList.add('visible'); }
+function hideAlert(el) { el.classList.remove('visible'); }
+
+// ==================== RECENT TASKS ==================== 
+function addRecentTask(taskId, taskName, taskStatus) {
+    const existing = recentTasks.find(t => t.id === taskId);
+    if (existing) {
+        existing.status = taskStatus;
+    } else {
+        recentTasks.unshift({ id: taskId, name: taskName, status: taskStatus });
+        if (recentTasks.length > 8) recentTasks.pop();
     }
+    renderRecentTasks();
+}
 
-    // Check task status functionality
-    checkStatusButton.addEventListener('click', async () => {
-        if (!apiToken) {
-            statusResponseDisplay.textContent = 'Error: Not logged in. Please login first.';
+function renderRecentTasks() {
+    if (recentTasks.length === 0) {
+        recentTasksList.innerHTML = `<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:20px 0;">No tasks yet.</div>`;
+        return;
+    }
+    recentTasksList.innerHTML = recentTasks.map(t => `
+        <div class="task-item" onclick="jumpToTask('${escapeHtml(t.id)}')" title="Click to monitor this task">
+            <span class="task-item-id">${escapeHtml(t.id.substring(0, 18))}…</span>
+            <span class="task-item-name">${escapeHtml((t.name || '').replace(/_/g, ' '))}</span>
+            ${makeStatusBadge(t.status)}
+        </div>
+    `).join('');
+}
+
+function jumpToTask(taskId) {
+    taskIdInput.value = taskId;
+    startPolling(taskId);
+}
+
+// ==================== AUTH ====================
+async function handleLogin(event) {
+    event.preventDefault();
+    hideAlert(loginError);
+
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    loginButton.disabled = true;
+    loginButton.textContent = 'Signing in…';
+
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
+
+    try {
+        const response = await fetch('/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        apiToken    = data.access_token;
+        currentUser = username;
+
+        usernameBadge.textContent  = username;
+        userAvatar.textContent     = username[0].toUpperCase();
+
+        loginView.style.display = 'none';
+        dashboardView.classList.add('visible');
+
+        // Staggered card entrance animations
+        document.querySelectorAll('.bento-card').forEach((card, i) => {
+            card.style.animation = `slideInUp 0.4s ease ${i * 0.07}s both`;
+        });
+
+    } catch (error) {
+        showAlert(loginError, error.message);
+        loginButton.disabled = false;
+        loginButton.textContent = 'Sign in';
+    }
+}
+
+function handleLogout() {
+    stopPolling();
+    apiToken    = null;
+    currentUser = null;
+
+    loginView.style.display = '';
+    dashboardView.classList.remove('visible');
+
+    loginButton.disabled    = false;
+    loginButton.textContent = 'Sign in';
+    document.getElementById('loginForm').reset();
+}
+
+// ==================== TASK SUBMISSION ====================
+const TASK_CONFIG = {
+    process_task: {
+        endpoint:   '/tasks/process',
+        getPayload: () => ({ data: document.getElementById('genericData').value }),
+        buttonId:   'submitGenericBtn',
+        label:      'Process Task',
+    },
+    add_numbers: {
+        endpoint:   '/tasks/process-numbers',
+        getPayload: () => ({
+            numbers: document.getElementById('numbersData').value
+                .split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n)),
+        }),
+        buttonId:   'submitNumbersBtn',
+        label:      'Add Numbers',
+    },
+    simulate_image_processing: {
+        endpoint:   '/tasks/process-image',
+        getPayload: () => ({ image_id: document.getElementById('imageData').value.trim() }),
+        buttonId:   'submitImageBtn',
+        label:      'Image Processing',
+    },
+};
+
+async function submitTask(taskType) {
+    if (!apiToken) return;
+
+    const config = TASK_CONFIG[taskType];
+    if (!config) return;
+
+    const button       = document.getElementById(config.buttonId);
+    const originalText = button.textContent;
+    button.disabled    = true;
+    button.textContent = 'Submitting…';
+
+    try {
+        const payload  = config.getPayload();
+        const response = await fetch(config.endpoint, {
+            method:  'POST',
+            headers: {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${apiToken}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.task_id) {
+            addRecentTask(data.task_id, config.label, 'SUBMITTED');
+            taskIdInput.value = data.task_id;
+            startPolling(data.task_id);        // #10 — kick off auto-polling
+        }
+
+    } catch (error) {
+        setStatusError(`Submission failed: ${error.message}`);
+    } finally {
+        button.disabled    = false;
+        button.textContent = originalText;
+    }
+}
+
+// ==================== AUTO-POLLING (#10) ====================
+const TERMINAL_STATES = new Set(['SUCCESS', 'FAILURE', 'REVOKED']);
+
+function startPolling(taskId) {
+    stopPolling();                        // cancel any existing poll first
+    activePollingId = taskId;
+    pollingBadge.classList.add('visible');
+
+    fetchTaskStatus(taskId);             // immediate first check
+
+    pollingInterval = setInterval(() => {
+        // If the user manually changed the Task ID input, follow it
+        const currentId = taskIdInput.value.trim();
+        if (currentId && currentId !== activePollingId) {
+            stopPolling();
             return;
         }
-        const taskId = document.getElementById('taskIdInput').value;
-        if (!taskId) {
-            statusResponseDisplay.textContent = 'Error: Please enter a Task ID.';
-            return;
+        fetchTaskStatus(taskId);
+    }, 2000);
+}
+
+function stopPolling() {
+    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+    activePollingId = null;
+    pollingBadge.classList.remove('visible');
+}
+
+async function fetchTaskStatus(taskId) {
+    if (!apiToken || !taskId) return;
+    try {
+        const response = await fetch(`/tasks/${taskId}`, {
+            headers: { 'Authorization': `Bearer ${apiToken}` },
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${response.status}`);
         }
 
-        try {
-            statusResponseDisplay.textContent = 'Checking status...';
-            const response = await fetch(`/tasks/${taskId}`, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${apiToken}` }
-            });
+        const data = await response.json();
+        renderStatusResult(data);
+        addRecentTask(taskId, data.name || 'Task', data.status);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            statusResponseDisplay.textContent = JSON.stringify(data, null, 2);
-        } catch (error) {
-            console.error('Check status error:', error);
-            statusResponseDisplay.textContent = `Error: ${error.message}`;
+        if (TERMINAL_STATES.has(data.status)) {
+            stopPolling();
         }
-    });
+    } catch (error) {
+        setStatusError(`Error polling status: ${error.message}`);
+        stopPolling();
+    }
+}
 
-    // Expose submitTask globally if buttons use onclick="submitTask(...)" directly in HTML
-    // If event listeners were added in JS for each button, this wouldn't be needed.
-    window.submitTask = submitTask;
+function manualCheckStatus() {
+    const taskId = taskIdInput.value.trim();
+    if (!taskId) { setStatusError('Please enter a Task ID.'); return; }
+    startPolling(taskId);
+}
 
-    </script>
+// ==================== STATUS RENDERING ====================
+function renderStatusResult(data) {
+    const isPolling   = pollingInterval !== null;
+    const pollingHint = isPolling
+        ? `<div class="polling-header"><span class="spinner"></span><span>Polling every 2 s — will stop automatically on terminal state</span></div>`
+        : '';
+
+    const createdStr   = data.created_at   ? ` • Created: <span style="color:var(--text-secondary);">${new Date(data.created_at + 'Z').toLocaleTimeString()}</span>`   : '';
+    const completedStr = data.completed_at ? ` • Completed: <span style="color:var(--text-secondary);">${new Date(data.completed_at + 'Z').toLocaleTimeString()}</span>` : '';
+
+    const resultBlock = (data.result !== null && data.result !== undefined)
+        ? `<div style="margin-top:8px;font-size:11px;color:var(--text-muted);margin-bottom:4px;">Result:</div>
+           <div style="color:var(--text-primary);">${escapeHtml(String(data.result))}</div>`
+        : `<div style="color:var(--text-muted);font-style:italic;font-size:12px;margin-top:8px;">No result yet…</div>`;
+
+    statusResult.innerHTML = `
+        ${pollingHint}
+        <div class="status-live-row">
+            <span style="font-family:'Inter',sans-serif;font-size:12px;color:var(--text-muted);">
+                ID: <span style="color:var(--text-secondary);">${escapeHtml(data.task_id || '—')}</span>
+            </span>
+            ${makeStatusBadge(data.status)}
+        </div>
+        <div style="font-family:'Inter',sans-serif;font-size:12px;color:var(--text-muted);margin-bottom:4px;">
+            Task: <span style="color:var(--text-secondary);">${escapeHtml((data.name || 'N/A').replace(/_/g,' '))}</span>
+            ${createdStr}${completedStr}
+        </div>
+        ${resultBlock}
+    `;
+    statusResult.classList.add('animate-in');
+    setTimeout(() => statusResult.classList.remove('animate-in'), 350);
+}
+
+function setStatusError(msg) {
+    statusResult.innerHTML = `
+        <div style="color:var(--error);font-family:'Inter',sans-serif;font-size:13px;display:flex;align-items:center;gap:8px;">
+            <span>⚠</span><span>${escapeHtml(msg)}</span>
+        </div>`;
+}
+
+// Expose handlers used by inline HTML event attributes
+window.submitTask         = submitTask;
+window.handleLogin        = handleLogin;
+window.handleLogout       = handleLogout;
+window.manualCheckStatus  = manualCheckStatus;
+window.jumpToTask         = jumpToTask;
+</script>
 </body>
 </html>
